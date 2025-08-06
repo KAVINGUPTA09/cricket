@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cricket Live Score</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: url("Virat-Kohli-and-Rohit-Sharma-celebrate-Indias-ICC-Champions-Trophy-2025-win.avif") no-repeat center center fixed;
+      background-size: cover;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      background: rgba(0, 0, 0, 0.75);
+      padding: 30px;
+      border-radius: 15px;
+      display: inline-block;
+      max-width: 700px;
+      width: 90%;
+    }
+    select, button, input {
+      margin: 10px;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      background-color: #28a745;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    #score {
+      font-size: 26px;
+      margin: 25px 0;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    #lastRecord {
+      margin-top: 30px;
+      font-size: 18px;
+      color: #fffacd;
+    }
+    input[type="text"] {
+      width: 60%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏏 Live Cricket Scoreboard</h1>
+
+    <label for="teamSelect">Select Team:</label>
+    <select id="teamSelect" onchange="changeTeam()">
+      <option value="India">🇮🇳 India</option>
+      <option value="Australia">🇦🇺 Australia</option>
+      <option value="England">ENG</option>
+      <option value="Pakistan">🇵🇰 Pakistan</option>
+    </select>
+
+    <label for="formatSelect">Format:</label>
+    <select id="formatSelect" onchange="changeFormat()">
+      <option value="T10">T10</option>
+      <option value="T20">T20</option>
+      <option value="ODI">ODI</option>
+      <option value="Test">Test</option>
+      <option value="8Over">8 Over Club Match</option>
+      <option value="5Over">5 Over Club Match</option>
+    </select>
+
+    <label for="batsman">Batsman Name:</label>
+    <input type="text" id="batsman" placeholder="Enter Batsman Name" />
+
+    <label for="bowler">Bowler Name:</label>
+    <input type="text" id="bowler" placeholder="Enter Bowler Name" />
+
+    <h2 id="team">🇮🇳 India</h2>
+    <p id="format">Format: T10</p>
+    <p id="score">Score: 0 / 0<br>Overs: 0.0</p>
+
+    <div>
+      <button onclick="addRun(1)">+1 Run</button>
+      <button onclick="addRun(2)">+2 Runs</button>
+      <button onclick="addRun(4)">+4 Runs</button>
+      <button onclick="addRun(6)">+6 Runs</button>
+      <button onclick="addWide()">+1 Wide</button>
+      <button onclick="addNoBall()">+1 No Ball</button>
+      <button onclick="addDotBall()">Dot Ball</button>
+      <button onclick="addWicket()">Wicket</button>
+      <button onclick="undo()">Undo ⬅️</button>
+      <button onclick="resetMatch()">Reset 🔁</button>
+      <button onclick="saveMatch()">💾 Save Scorecard</button>
+      <button onclick="downloadScorecard()">⬇️ Download .TXT</button>
+      <button onclick="downloadPDF()">📄 Download .PDF</button>
+    </div>
+
+    <div id="lastRecord"></div>
+  </div>
+
+  <script>
+    let runs = 0;
+    let wickets = 0;
+    let balls = 0;
+    let maxOvers = 10;
+    let currentTeam = "India";
+    let currentFormat = "T10";
+    let history = [];
+
+    const flagMap = {
+      "India": "🇮🇳",
+      "Australia": "🇦🇺",
+      "England": "ENG",
+      "Pakistan": "🇵🇰"
+    };
+
+    function updateScore() {
+      const overs = Math.floor(balls / 6) + '.' + (balls % 6);
+      document.getElementById("score").innerHTML = `Score: ${runs} / ${wickets}<br>Overs: ${overs}`;
+    }
+
+    function addRun(run) {
+      if (!isInningsOver()) {
+        history.push({ type: "run", value: run });
+        runs += run;
+        balls++;
+        checkEnd();
+        updateScore();
+      }
+    }
+
+    function addDotBall() {
+      if (!isInningsOver()) {
+        history.push({ type: "dot" });
+        balls++;
+        checkEnd();
+        updateScore();
+      }
+    }
+
+    function addWicket() {
+      if (!isInningsOver()) {
+        history.push({ type: "wicket" });
+        wickets++;
+        balls++;
+        checkEnd();
+        updateScore();
+      }
+    }
+
+    function addWide() {
+      if (!isInningsOver()) {
+        history.push({ type: "wide" });
+        runs += 1;
+        updateScore();
+      }
+    }
+
+    function addNoBall() {
+      if (!isInningsOver()) {
+        history.push({ type: "noball" });
+        runs += 1;
+        updateScore();
+      }
+    }
+
+    function undo() {
+      const last = history.pop();
+      if (!last) return;
+
+      switch (last.type) {
+        case "run":
+          runs -= last.value;
+          balls--;
+          break;
+        case "dot":
+          balls--;
+          break;
+        case "wicket":
+          wickets--;
+          balls--;
+          break;
+        case "wide":
+        case "noball":
+          runs--;
+          break;
+      }
+
+      updateScore();
+    }
+
+    function isInningsOver() {
+      return (Math.floor(balls / 6) >= maxOvers || wickets >= 10);
+    }
+
+    function checkEnd() {
+      if (isInningsOver()) {
+        alert("🏁 Innings Over!");
+        saveMatch();
+      }
+    }
+
+    function resetMatch() {
+      runs = 0;
+      wickets = 0;
+      balls = 0;
+      history = [];
+      updateScore();
+    }
+
+    function changeTeam() {
+      currentTeam = document.getElementById("teamSelect").value;
+      document.getElementById("team").innerText = `${flagMap[currentTeam]} ${currentTeam}`;
+    }
+
+    function changeFormat() {
+      currentFormat = document.getElementById("formatSelect").value;
+      document.getElementById("format").innerText = "Format: " + currentFormat;
+
+      switch (currentFormat) {
+        case "T10": maxOvers = 10; break;
+        case "T20": maxOvers = 20; break;
+        case "ODI": maxOvers = 50; break;
+        case "Test": maxOvers = 90; break;
+        case "8Over": maxOvers = 8; break;
+        case "5Over": maxOvers = 5; break;
+        default: maxOvers = 10;
+      }
+
+      resetMatch();
+    }
+
+    function saveMatch() {
+      const overs = Math.floor(balls / 6) + '.' + (balls % 6);
+      const batsman = document.getElementById("batsman").value || "Not entered";
+      const bowler = document.getElementById("bowler").value || "Not entered";
+
+      const record = {
+        team: currentTeam,
+        format: currentFormat,
+        runs,
+        wickets,
+        overs,
+        batsman,
+        bowler
+      };
+
+      localStorage.setItem("lastMatch", JSON.stringify(record));
+      displayLastRecord();
+    }
+
+    function displayLastRecord() {
+      const data = JSON.parse(localStorage.getItem("lastMatch"));
+      if (data) {
+        document.getElementById("lastRecord").innerHTML =
+          `🗂 Last Match Record:<br>
+           Team: ${flagMap[data.team]} ${data.team} <br>
+           Format: ${data.format} <br>
+           Score: ${data.runs} / ${data.wickets} <br>
+           Overs: ${data.overs} <br>
+           Batsman: ${data.batsman} <br>
+           Bowler: ${data.bowler}`;
+      }
+    }
+
+    function downloadScorecard() {
+      const batsman = document.getElementById("batsman").value || "Not entered";
+      const bowler = document.getElementById("bowler").value || "Not entered";
+      const overs = Math.floor(balls / 6) + '.' + (balls % 6);
+
+      const text = `
+🏏 Cricket Match Scorecard
+-----------------------------
+Team: ${flagMap[currentTeam]} ${currentTeam}
+Format: ${currentFormat}
+Batsman: ${batsman}
+Bowler: ${bowler}
+Score: ${runs} / ${wickets}
+Overs: ${overs}
+-----------------------------`.trim();
+
+      const blob = new Blob([text], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${currentTeam}_Scorecard.txt`;
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const batsman = document.getElementById("batsman").value || "Not entered";
+      const bowler = document.getElementById("bowler").value || "Not entered";
+      const overs = Math.floor(balls / 6) + '.' + (balls % 6);
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text("🏏 Cricket Match Scorecard", 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Team: ${flagMap[currentTeam]} ${currentTeam}`, 20, 35);
+      doc.text(`Format: ${currentFormat}`, 20, 45);
+      doc.text(`Batsman: ${batsman}`, 20, 55);
+      doc.text(`Bowler: ${bowler}`, 20, 65);
+      doc.text(`Score: ${runs} / ${wickets}`, 20, 75);
+      doc.text(`Overs: ${overs}`, 20, 85);
+
+      doc.save(`${currentTeam}_Scorecard.pdf`);
+    }
+
+    // Initial render
+    updateScore();
+    displayLastRecord();
+  </script>
+</body>
+</html>
